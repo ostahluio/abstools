@@ -2,6 +2,11 @@
 /.vagrant
 /.recommenders
 .rebar/
+/.gradle
+.settings/
+.project
+.classpath
+/frontend/out
 bin/
 build/
 /**/gen/

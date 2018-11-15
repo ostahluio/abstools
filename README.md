@@ -1,5 +1,7 @@
-ABS Tools [![Build Status](https://envisage.ifi.uio.no:8080/jenkins/buildStatus/icon?job=ABS-All-Bucky)](https://envisage.ifi.uio.no:8080/jenkins/job/ABS-All-Bucky)
+ABS Tools
 =========
+
+[![CircleCI](https://circleci.com/gh/abstools/abstools/tree/master.svg?style=svg)](https://circleci.com/gh/abstools/abstools/tree/master)
 
 Inside this repository we develop the core tools of the ABS modelling
 language.  The current language manual is at http://docs.abs-models.org.
@@ -17,8 +19,9 @@ Folders
 -------
 
 * `frontend` - the ABS compiler and runtime support.  See frontend/README for
-  installation instructions.  (short version: install jdk8, ant and erlang
-  version 21, then run `make frontend` in this directory.)
+  installation instructions.  (short version: install jdk8 and erlang
+  version 21, then run `./gradlew assemble` in the `frontend` directory,
+  or `.\gradlew.bat assemble` on windows.)
 
 
 * `abs-docs` - the ABS language manual, available online at
@@ -32,7 +35,8 @@ Folders
     written in [Ott](https://www.cl.cam.ac.uk/~pes20/ott/)
 
 
-* `emacs` - Editor support for ABS.
+* `emacs` - Editor support for ABS -- moved to
+  https://github.com/abstools/abs-mode but left here for existing users.
 
 * `org.abs-models.releng` - Files used by Jenkins and Buckminster for
   continuous integration at https://envisage.ifi.uio.no:8080/jenkins/.
