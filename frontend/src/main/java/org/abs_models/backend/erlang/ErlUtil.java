@@ -40,7 +40,7 @@ public class ErlUtil {
             b.append("P_" + p.getName());
         }
 
-        if (args.hasChildren()) {
+        if (args.getNumChild() > 0) {
             b.append(',');
         }
 
@@ -120,7 +120,7 @@ public class ErlUtil {
         ecs.print("[");
         buildParamsWithOutBrackets(ecs, params, vars);
 
-        if (params.hasChildren()) {
+        if (params.getNumChild() > 0) {
             ecs.print(',');
         }
 
@@ -144,17 +144,17 @@ public class ErlUtil {
         }
     }
 
-    public static void argumentList(CodeStream ecs, PureExp callee, boolean builtin, boolean imperativeContext, org.abs_models.frontend.ast.List<PureExp> params, Vars vars, boolean includeLocalVarsInStack) {
+    public static void argumentList(CodeStream ecs, PureExp callee, boolean builtin, boolean imperativeContext, org.abs_models.frontend.ast.List<PureExp> params, Vars vars) {
         ecs.print("(");
         if (callee != null) {
             callee.generateErlangCode(ecs, vars);
-            if (params.hasChildren()) {
+            if (params.getNumChild() > 0) {
                 ecs.print(",");
             }
 
         } else {
             ecs.print("Cog");
-            if (params.hasChildren()) {
+            if (params.getNumChild() > 0) {
                 ecs.print(",");
             }
         }
@@ -165,7 +165,7 @@ public class ErlUtil {
             ecs.print(',');
 
             if (imperativeContext) {
-                ecs.print(vars.toStack(includeLocalVarsInStack));
+                ecs.print(vars.toStack());
             } else {
                 ecs.print("Stack");
             }
@@ -179,7 +179,7 @@ public class ErlUtil {
         ecs.incIndent();
         ecs.println("{stop_world, CogRef} ->");
         ecs.incIndent();
-        ecs.println("cog:process_is_blocked_for_gc(Cog, self()),");
+        ecs.println("cog:process_is_blocked_for_gc(Cog, self(), get(process_info), get(this)),");
         ecs.println("cog:process_is_runnable(Cog,self()),");
         ecs.print("task:wait_for_token(Cog,");
         if (functional) {

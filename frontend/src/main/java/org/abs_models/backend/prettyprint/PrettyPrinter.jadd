@@ -4,6 +4,10 @@ import org.abs_models.backend.prettyprint.*;
 
 aspect doPrettyPrinter {
 
+    /** Controls whether to include the standard library in pretty-printing
+     */
+    public boolean Model.doPrettyPrintStdLib = false;
+
     public void List.doPrettyPrint(PrintWriter stream, ABSFormatter formatter, String separator) {
         if (getNumChild() > 0) {
             getChild(0).doPrettyPrint(stream, formatter);
@@ -31,7 +35,7 @@ aspect doPrettyPrinter {
 
     public void Model.doPrettyPrint(PrintWriter stream, ABSFormatter formatter) {
         for (ModuleDecl d : getModuleDecls()) {
-            if (! Constants.BUILT_IN_LIBS.contains(d.getName())) {
+            if (doPrettyPrintStdLib || (! Constants.BUILT_IN_LIBS.contains(d.getName()))) {
                 d.doPrettyPrint(stream, formatter);
             }
         }
@@ -381,6 +385,7 @@ aspect doPrettyPrinter {
     }
 
     public void IfStmt.doPrettyPrint(PrintWriter stream, ABSFormatter formatter) {
+        getAnnotationList().doPrettyPrint(stream, formatter, "");
         stream.print("if ( ");
         getCondition().doPrettyPrint(stream, formatter);
         stream.print(" )");
@@ -392,16 +397,19 @@ aspect doPrettyPrinter {
     }
 
     public void ReturnStmt.doPrettyPrint(PrintWriter stream, ABSFormatter formatter) {
+        getAnnotationList().doPrettyPrint(stream, formatter, "");
         stream.print("return ");
         getRetExp().doPrettyPrint(stream, formatter);
         stream.print(";");
     }
 
     public void SkipStmt.doPrettyPrint(PrintWriter stream, ABSFormatter formatter) {
+        getAnnotationList().doPrettyPrint(stream, formatter, "");
         stream.print("skip;");
     }
 
     public void SuspendStmt.doPrettyPrint(PrintWriter stream, ABSFormatter formatter) {
+        getAnnotationList().doPrettyPrint(stream, formatter, "");
         stream.print("suspend;");
     }
 
@@ -426,6 +434,7 @@ aspect doPrettyPrinter {
     }
 
     public void WhileStmt.doPrettyPrint(PrintWriter stream, ABSFormatter formatter) {
+        getAnnotationList().doPrettyPrint(stream, formatter, "");
         stream.print("while (");
         getCondition().doPrettyPrint(stream, formatter);
         stream.print(") ");
@@ -433,6 +442,7 @@ aspect doPrettyPrinter {
     }
 
     public void ForeachStmt.doPrettyPrint(PrintWriter stream, ABSFormatter formatter) {
+        getAnnotationList().doPrettyPrint(stream, formatter, "");
         stream.print("foreach (");
         stream.print(getLoopVarDecl().getName());
         stream.print(" in ");
@@ -442,6 +452,7 @@ aspect doPrettyPrinter {
     }
 
     public void CaseStmt.doPrettyPrint(PrintWriter stream, ABSFormatter formatter) {
+        getAnnotationList().doPrettyPrint(stream, formatter, "");
         stream.print("case ");
         getExpr().doPrettyPrint(stream, formatter);
         formatter.beforeOpenBrace();
@@ -461,6 +472,7 @@ aspect doPrettyPrinter {
     }
 
     public void TryCatchFinallyStmt.doPrettyPrint(PrintWriter stream, ABSFormatter formatter) {
+        getAnnotationList().doPrettyPrint(stream, formatter, "");
         stream.print("try ");
         getBody().doPrettyPrint(stream, formatter);
         stream.print(" catch");
@@ -1203,12 +1215,13 @@ aspect doPrettyPrinter {
     }
 
     public void IfExp.doPrettyPrint(PrintWriter stream, ABSFormatter formatter) {
-        stream.print("if ");
+        stream.print("(if ");
         getCondExp().doPrettyPrint(stream, formatter);
         stream.print(" then ");
         getThenExp().doPrettyPrint(stream, formatter);
         stream.print(" else ");
         getElseExp().doPrettyPrint(stream, formatter);
+        stream.print(")");
     }
 
     public void LetExp.doPrettyPrint(PrintWriter stream, ABSFormatter formatter) {

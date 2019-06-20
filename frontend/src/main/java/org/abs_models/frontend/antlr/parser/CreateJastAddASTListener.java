@@ -4,17 +4,16 @@
  */
 package org.abs_models.frontend.antlr.parser;
 
+import org.abs_models.frontend.antlr.parser.ABSParser.MethodsigContext;
+import org.abs_models.frontend.antlr.parser.ABSParser.TraitApplyFragmentContext;
+import org.abs_models.frontend.antlr.parser.ABSParser.TraitNameFragmentContext;
+import org.abs_models.frontend.antlr.parser.ABSParser.TraitSetFragmentContext;
 import org.abs_models.frontend.ast.*;
 import org.abs_models.frontend.parser.Main;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.ParseTreeProperty;
-
-import org.abs_models.frontend.antlr.parser.ABSParser.MethodsigContext;
-import org.abs_models.frontend.antlr.parser.ABSParser.TraitApplyFragmentContext;
-import org.abs_models.frontend.antlr.parser.ABSParser.TraitNameFragmentContext;
-import org.abs_models.frontend.antlr.parser.ABSParser.TraitSetFragmentContext;
 
 /**
  * This class creates the JastAdd AST from an Antlr parse tree.
@@ -122,6 +121,27 @@ public class CreateJastAddASTListener extends ABSBaseListener {
                 case 'r' : s.append('\r'); break;
                 case 't' : s.append('\t'); break;
                 default : s.append(c); break;
+                }
+            } else {
+                s.append(c);
+            }
+        }
+        return new StringLiteral(s.toString());
+    }
+
+    private PureExp makeTemplateStringLiteral(String tokenText) {
+        StringBuffer s = new StringBuffer(tokenText.length() - 2);
+        // i = 1..len-1 to skip beginning and ending \` of the stringliteral
+        for (int i = 1; i < tokenText.length() - 1; i++) {
+            char c = tokenText.charAt(i);
+            if (c == '\\') {
+                i++;
+                char c1 = tokenText.charAt(i);
+                switch (c1) {
+                case '`' : s.append('`'); break;   // escaped end (\`)
+                case '$' : s.append('$'); break;   // escaped interpolation delimiter (\$)
+                // do not drop backslash if it doesn't escape any of the above:
+                default : s.append('\\'); s.append(c1); break;
                 }
             } else {
                 s.append(c);
@@ -322,7 +342,15 @@ public class CreateJastAddASTListener extends ABSBaseListener {
 
     // Interfaces
     @Override public void exitInterface_decl(ABSParser.Interface_declContext ctx) {
-        setV(ctx, new InterfaceDecl(ctx.TYPE_IDENTIFIER().getText(), v(ctx.annotations()), l(ctx.e), l(ctx.methodsig())));
+        InterfaceDecl i = new InterfaceDecl(ctx.TYPE_IDENTIFIER().getText(), v(ctx.annotations()), l(ctx.e), l(ctx.methodsig()));
+        if (!i.hasExtendedInterfaceUse() && !i.getName().equals("Object")) {
+            InterfaceTypeUse s = new InterfaceTypeUse("ABS.StdLib.Object", new List());
+            // set position such that SourcePosition.findPosition() does not
+            // find this node
+            s.setPosition(-1, 0, -1, 0);
+            i.addExtendedInterfaceUseNoTransform(s);
+        }
+        setV(ctx, i);
     }
 
     @Override public void exitMethodsig(ABSParser.MethodsigContext ctx) {
@@ -343,6 +371,13 @@ public class CreateJastAddASTListener extends ABSBaseListener {
                 b.addStmt(v(s));
             }
             c.setInitBlock(b);
+        }
+        if (!c.hasImplementedInterfaceUse()) {
+            InterfaceTypeUse s = new InterfaceTypeUse("ABS.StdLib.Object", new List());
+            // set position such that SourcePosition.findPosition() does not
+            // find this node
+            s.setPosition(-1, 0, -1, 0);
+            c.addImplementedInterfaceUseNoTransform(s);
         }
     }
 
@@ -468,16 +503,23 @@ public class CreateJastAddASTListener extends ABSBaseListener {
     }
     @Override public void exitCaseStmt(ABSParser.CaseStmtContext ctx) {
         List<CaseBranchStmt> branches = l(ctx.casestmtbranch());
-        // Add default branch that throws PatternMatchFailException.  See
-        // "Behavior of non-exhaustive case statement: no branch match = skip
-        // or error?" on abs-dev on Jan 25-26, 2017
-        Block block = new Block(new List<>(), new List<>());
-        block.addStmt(new ThrowStmt(new List<>(),
-                                    new DataConstructorExp("PatternMatchFailException",
-                                                           new List<>())));
-        CaseBranchStmt defaultBranch = new CaseBranchStmt(new UnderscorePattern(), block);
-        setASTNodePosition(ctx, defaultBranch);
-        branches.add(defaultBranch);
+        CaseBranchStmt lastbranch = null;
+        if (branches.getNumChildNoTransform() > 0) {
+            lastbranch = branches.getChildNoTransform(branches.getNumChildNoTransform() - 1);
+        }
+        if (lastbranch == null || !(lastbranch.getLeftNoTransform() instanceof UnderscorePattern)) {
+            // Add default branch that throws
+            // PatternMatchFailException.  See "Behavior of
+            // non-exhaustive case statement: no branch match = skip
+            // or error?" on abs-dev on Jan 25-26, 2017
+            Block block = new Block(new List<>(), new List<>());
+            block.addStmt(new ThrowStmt(new List<>(),
+                                        new DataConstructorExp("PatternMatchFailException",
+                                                               new List<>())));
+            CaseBranchStmt defaultBranch = new CaseBranchStmt(new UnderscorePattern(), block);
+            setASTNodePosition(ctx, defaultBranch);
+            branches.add(defaultBranch);
+        }
         setV(ctx, new CaseStmt(v(ctx.annotations()), v(ctx.c), branches));
     }
     @Override public void exitCasestmtbranch(ABSParser.CasestmtbranchContext ctx) {
@@ -606,7 +648,6 @@ public class CreateJastAddASTListener extends ABSBaseListener {
     @Override public void exitUnaryExp(ABSParser.UnaryExpContext ctx) {
         switch (ctx.op.getType()) {
         case ABSParser.NEGATION :
-        case ABSParser.NEGATION_CREOL :
             setV(ctx, new NegExp(v(ctx.pure_exp())));
             break;
         case ABSParser.MINUS :
@@ -681,6 +722,26 @@ public class CreateJastAddASTListener extends ABSBaseListener {
     @Override public void exitStringExp(ABSParser.StringExpContext ctx) {
         setV(ctx, makeStringLiteral(ctx.STRINGLITERAL().getText()));
     }
+    @Override public void exitTemplateStringExp(ABSParser.TemplateStringExpContext ctx) {
+        setV(ctx, makeTemplateStringLiteral(ctx.TEMPLATESTRINGLITERAL().getText()));
+    }
+    @Override public void exitTemplateStringCompoundExp(ABSParser.TemplateStringCompoundExpContext ctx) {
+        PureExp result = new AddAddExp(makeTemplateStringLiteral(ctx.TEMPLATESTRINGSTART().getText()),
+                                       new FnApp("toString",
+                                                 new List().add(v(ctx.e1))));
+        for (int i = 0; i < ctx.e.size(); i++) {
+            PureExp e = v(ctx.e.get(i));
+            // List<PureExp> arglist = new List<PureExp>();
+            // arglist.
+            PureExp s = makeTemplateStringLiteral(ctx.b.get(i).getText());
+            PureExp part = new AddAddExp(s,
+                                         new FnApp("toString",
+                                                   new List().add(e)));
+            result = new AddAddExp(result, part);
+        }
+        result = new AddAddExp(result, makeTemplateStringLiteral(ctx.TEMPLATESTRINGEND().getText()));
+        setV(ctx, result);
+    }
     @Override public void exitThisExp(ABSParser.ThisExpContext ctx) {
         setV(ctx, new ThisExp());
     }
@@ -700,11 +761,21 @@ public class CreateJastAddASTListener extends ABSBaseListener {
         setV(ctx, new CaseExp(v(ctx.c), l));
     }
     @Override public void exitLetExp(ABSParser.LetExpContext ctx) {
-        ParamDecl pd = new ParamDecl(ctx.IDENTIFIER().getText(),
-            v(ctx.type_use()),
-            new List<>());
-        setASTNodePosition(ctx.IDENTIFIER().getSymbol(), pd);
-        setV(ctx, new LetExp(pd, v(ctx.e), v(ctx.b)));
+	// For a source-level let expression with multiple bindings,
+	// create nested let expressions with one binding each.
+
+	// TODO: consider changing AST to support multiple bindings in
+	// LetExp - backends might be able to do something useful with
+	// the additional information
+	int nbindings = ctx.e.size(); // ctx.t, ctx.id have the same length
+	PureExp body = v(ctx.body);
+	for (int i = nbindings - 1; i >= 0; i--) {
+	    ParamDecl pd = new ParamDecl(ctx.id.get(i).getText(),
+					 v(ctx.t.get(i)), new List<>());
+	    setASTNodePosition(ctx.id.get(i), pd);
+	    body = new LetExp(pd, v(ctx.e.get(i)), body);
+	}
+	setV(ctx, body);
     }
     @Override public void exitImplementsExp(ABSParser.ImplementsExpContext ctx) {
         setV(ctx, new ImplementsExp(v(ctx.e), v(ctx.i)));
